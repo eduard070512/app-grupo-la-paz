@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paz-950: #1f1029;
+  --color-paz-900: #2e1a40;
+  --color-paz-800: #3d2352;
+  --color-paz-700: #523067;
+  --color-paz-600: #6b4285;
+  --color-paz-500: #8a5fa6;
+  --color-paz-300: #c9b3db;
+  --color-paz-200: #e2d5ec;
+  --color-paz-100: #f1eaf6;
+  --color-paz-50: #f9f6fb;
+  --color-oro-700: #8f6a2c;
+  --color-oro-600: #a8823f;
+  --color-oro-500: #c6a15b;
+  --color-oro-300: #e3cb98;
+  --color-oro-100: #f7efdc;
+  --color-crema: #fbf8f3;
+  --color-tinta: #2a2230;
+  --color-gris: #6e6475;
+
+  --font-serif: var(--font-cormorant), "Georgia", serif;
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-crema);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+}
+
+@utility titulo {
+  @apply font-serif font-semibold text-paz-900 tracking-tight;
+}
+@utility tarjeta {
+  @apply rounded-2xl bg-white shadow-[0_1px_2px_rgba(46,26,64,.06),0_8px_24px_-12px_rgba(46,26,64,.18)] ring-1 ring-paz-900/5;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[.98] disabled:opacity-60 disabled:pointer-events-none;
+}
+@utility btn-primario {
+  @apply btn bg-paz-800 text-white hover:bg-paz-700;
+}
+@utility btn-oro {
+  @apply btn bg-oro-500 text-paz-950 hover:bg-oro-300;
+}
+@utility btn-secundario {
+  @apply btn bg-white text-paz-800 ring-1 ring-paz-200 hover:bg-paz-50;
+}
+@utility btn-whatsapp {
+  @apply btn bg-[#1f9d55] text-white hover:bg-[#188a49];
+}
+@utility btn-peligro {
+  @apply btn bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100;
+}
+@utility campo {
+  @apply block w-full rounded-xl border border-paz-200 bg-white px-4 py-3 text-base text-tinta placeholder:text-gris/60 outline-none transition focus:border-paz-500 focus:ring-4 focus:ring-paz-200/60;
+}
+@utility etiqueta {
+  @apply mb-1.5 block text-sm font-medium text-paz-900;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold;
+}
+@utility tabla {
+  @apply w-full text-left text-sm;
+  & th {
+    @apply border-b border-paz-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gris;
+  }
+  & td {
+    @apply border-b border-paz-50 px-3 py-3 align-top;
+  }
+}
+
+.fondo-marca {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(198, 161, 91, 0.22), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(138, 95, 166, 0.35), transparent 60%),
+    linear-gradient(160deg, var(--color-paz-900), var(--color-paz-950));
+}
+
+.pb-nav {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}

@@ -1,0 +1,3 @@
+numero_contrato,casa_funeraria,nombre_titular,telefono,email,clave_cliente,plan,fecha_contratacion,monto_total,pago_inicial,frecuencia,abono,numero_abonos,estatus,notas
+LP-50001,la-paz,Juan Pérez García,3121112233,juan@ejemplo.com,CLI-0001,LP-BOSNIA,15/03/2025,29700,500,MENSUAL,811,36,ACTIVO,
+MG-60001,magana,Ana Torres Ruiz,3124445566,,CLI-0002,MG-ZAFIRO,2024-11-02,47814,1328,MENSUAL,1328,35,ACTIVO,Cliente de ejemplo

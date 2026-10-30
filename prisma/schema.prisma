@@ -1,0 +1,239 @@
+// Modelo de datos Grupo La Paz
+//
+// DEMO: SQLite (archivo local). PRODUCCIÓN: cambiar `provider` a "postgresql"
+// y DATABASE_URL a la base real; el resto del esquema funciona igual.
+//
+// Convenciones:
+//  - Todos los montos se guardan en CENTAVOS (Int) para evitar errores de redondeo.
+//  - Los campos "lista" (incluye, beneficios…) se guardan como JSON en texto.
+//  - Los catálogos de estatus son strings; los valores válidos están en src/lib/constantes.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Casas funerarias que forman Grupo La Paz (La Paz, Magaña, Ramos, …)
+model Funeraria {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  nombre    String
+  telefono  String?
+  direccion String?
+  logoUrl   String?
+  orden     Int        @default(0)
+  activa    Boolean    @default(true)
+  clientes  Cliente[]
+  contratos Contrato[]
+  planes    Plan[]
+}
+
+/// Catálogo de planes (catálogo marzo 2026 + Sistema de Cobertura Familiar)
+model Plan {
+  id              String     @id @default(cuid())
+  codigo          String     @unique
+  nombre          String
+  categoria       String // COBERTURA_FAMILIAR | PREVISION | CREMACION | CAPILLA | NICHO | DEVUELVELO_A_CASA | ZOO_DESCANSO | OTRO
+  /// Casa funeraria que lo ofrece (null = todo el grupo)
+  funerariaId     String?
+  funeraria       Funeraria? @relation(fields: [funerariaId], references: [id])
+  subtitulo       String? // p.ej. "Ataúd de madera tapa plana"
+  resumen         String
+  /// Precio "desde" (la variante más económica), para listados
+  precioCentavos  Int
+  moneda          String     @default("MXN") // MXN | USD
+  /// JSON: string[]
+  incluye         String     @default("[]")
+  /// JSON: string[]
+  beneficios      String     @default("[]")
+  /// JSON: string[]
+  cremacion       String     @default("[]")
+  /// JSON: Variante[] = { nombre, precioCentavos, inicialCentavos, abonos: { SEMANAL?, QUINCENAL?, MENSUAL? } (centavos), nota? }
+  variantes       String     @default("[]")
+  /// JSON: { SEMANAL?: n, QUINCENAL?: n, MENSUAL?: n } número de abonos de cada esquema
+  plazos          String     @default("{}")
+  aplicaPara      String?
+  notas           String?
+  imagenUrl       String? // miniatura
+  fichaUrl        String? // ficha completa del catálogo
+  orden           Int        @default(0)
+  activo          Boolean    @default(true)
+  contratos       Contrato[]
+}
+
+/// Titular de uno o varios contratos. Accede con número de contrato + teléfono
+/// la primera vez (activación) y después con contraseña.
+model Cliente {
+  id             String          @id @default(cuid())
+  nombre         String
+  telefono       String // solo dígitos, 10 posiciones (MX)
+  email          String?         @unique
+  passwordHash   String?
+  activadoEn     DateTime?
+  ultimoAcceso   DateTime?
+  /// Clave del sistema anterior, para trazabilidad de la migración
+  claveExterna   String?         @unique
+  funerariaId    String
+  funeraria      Funeraria       @relation(fields: [funerariaId], references: [id])
+  contratos      Contrato[]
+  codigos        CodigoVerificacion[]
+  solicitudes    Solicitud[]
+  creadoEn       DateTime        @default(now())
+  actualizadoEn  DateTime        @updatedAt
+
+  @@index([telefono])
+}
+
+model Contrato {
+  id                  String         @id @default(cuid())
+  numero              String         @unique
+  clienteId           String
+  cliente             Cliente        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  planId              String
+  plan                Plan           @relation(fields: [planId], references: [id])
+  funerariaId         String
+  funeraria           Funeraria      @relation(fields: [funerariaId], references: [id])
+  fechaContratacion   DateTime
+  montoTotalCentavos  Int
+  pagoInicialCentavos Int            @default(0)
+  frecuencia          String // SEMANAL | QUINCENAL | MENSUAL | CONTADO
+  abonoCentavos       Int            @default(0)
+  numeroAbonos        Int            @default(0)
+  /// ACTIVO | LIQUIDADO | SUSPENDIDO | CANCELADO | UTILIZADO
+  estatus             String         @default("ACTIVO")
+  notas               String?
+  pagos               Pago[]
+  beneficiarios       Beneficiario[]
+  creadoEn            DateTime       @default(now())
+  actualizadoEn       DateTime       @updatedAt
+
+  @@index([clienteId])
+}
+
+model Beneficiario {
+  id              String    @id @default(cuid())
+  contratoId      String
+  contrato        Contrato  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  nombre          String
+  parentesco      String // TITULAR | CONYUGE | PADRE | MADRE | HIJO | HIJA | MASCOTA | OTRO
+  fechaNacimiento DateTime?
+}
+
+model Pago {
+  id              String   @id @default(cuid())
+  contratoId      String
+  contrato        Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  fecha           DateTime
+  montoCentavos   Int
+  metodo          String   @default("EFECTIVO") // EFECTIVO | TRANSFERENCIA | TARJETA | DEPOSITO
+  folio           String?
+  registradoPor   String?
+  creadoEn        DateTime @default(now())
+
+  @@unique([contratoId, folio])
+  @@index([contratoId, fecha])
+}
+
+/// Empresa afiliada. Un solo usuario/contraseña por empresa, compartido con sus empleados.
+model Empresa {
+  id                 String      @id @default(cuid())
+  slug               String      @unique
+  nombre             String
+  usuario            String      @unique
+  passwordHash       String
+  giro               String?
+  descripcion        String?
+  logoUrl            String?
+  telefono           String?
+  whatsapp           String?
+  sitioWeb           String?
+  direccion          String?
+  /// % de descuento para sus empleados en servicios de La Paz
+  descuentoEmpleados Int         @default(15)
+  /// Lo que la empresa ofrece a clientes de Grupo La Paz (publicidad cruzada)
+  ofertaClientes     String?
+  /// Mostrar en el directorio de aliados de la app de clientes
+  visibleDirectorio  Boolean     @default(true)
+  activa             Boolean     @default(true)
+  convenioDesde      DateTime    @default(now())
+  ultimoAcceso       DateTime?
+  solicitudes        Solicitud[]
+  creadoEn           DateTime    @default(now())
+  actualizadoEn      DateTime    @updatedAt
+}
+
+/// Promociones visibles en las apps
+model Promocion {
+  id          String    @id @default(cuid())
+  titulo      String
+  descripcion String
+  imagenUrl   String?
+  /// CLIENTES | EMPRESAS | TODOS
+  audiencia   String    @default("TODOS")
+  vigenteDesde DateTime @default(now())
+  vigenteHasta DateTime?
+  activa      Boolean   @default(true)
+  orden       Int       @default(0)
+  creadoEn    DateTime  @default(now())
+}
+
+/// Registro de solicitudes de cita / contacto (antes de abrir WhatsApp)
+model Solicitud {
+  id         String   @id @default(cuid())
+  origen     String // EMPRESA | CLIENTE
+  empresaId  String?
+  empresa    Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+  clienteId  String?
+  cliente    Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  nombre     String
+  telefono   String?
+  motivo     String
+  modalidad  String? // PRESENCIAL | LLAMADA | VIDEOLLAMADA
+  preferencia String?
+  mensaje    String
+  /// NUEVA | CONTACTADA | CERRADA
+  estatus    String   @default("NUEVA")
+  creadoEn   DateTime @default(now())
+
+  @@index([creadoEn])
+}
+
+/// Códigos de un solo uso (activación por WhatsApp/SMS y recuperación de contraseña)
+model CodigoVerificacion {
+  id         String    @id @default(cuid())
+  clienteId  String
+  cliente    Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  /// ACTIVACION | RECUPERACION
+  tipo       String
+  /// hash SHA-256 del código o token; nunca se guarda en claro
+  hash       String    @unique
+  intentos   Int       @default(0)
+  expiraEn   DateTime
+  usadoEn    DateTime?
+  creadoEn   DateTime  @default(now())
+
+  @@index([clienteId, tipo])
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  nombre       String
+  email        String    @unique
+  passwordHash String
+  rol          String    @default("ADMIN") // ADMIN | COBRANZA
+  ultimoAcceso DateTime?
+}
+
+/// Bitácora de intentos de acceso, para limitar fuerza bruta
+model IntentoAcceso {
+  id       String   @id @default(cuid())
+  clave    String // p.ej. "cliente:12345" o "empresa:usuario"
+  exito    Boolean
+  creadoEn DateTime @default(now())
+
+  @@index([clave, creadoEn])
+}
