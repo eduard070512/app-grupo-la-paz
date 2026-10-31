@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { normalizarTelefono } from "@/lib/formato";
 import { enviarEventoN8n } from "@/lib/n8n";
 import { bloqueado, MENSAJE_BLOQUEO, registrarIntento, verificarContrasena } from "@/lib/seguridad";
+import { errorDeConfiguracion } from "@/lib/sesion-token";
 import { cerrarSesion, iniciarSesion, requerirSesion } from "@/lib/sesion";
 import { linkWhatsApp } from "@/lib/whatsapp";
 
@@ -12,6 +13,8 @@ export type Estado = { error?: string; url?: string } | undefined;
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
 export async function entrar(_: Estado, f: FormData): Promise<Estado> {
+  const config = errorDeConfiguracion();
+  if (config) return { error: config };
   const usuario = s(f, "usuario").toLowerCase();
   const clave = `empresa:${usuario}`;
   if (await bloqueado(clave)) return { error: MENSAJE_BLOQUEO };

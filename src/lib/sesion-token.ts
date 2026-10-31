@@ -17,6 +17,14 @@ export const DURACION_SEG: Record<Rol, number> = {
 
 export type DatosSesion = { sub: string; rol: Rol; nombre: string };
 
+/** Mensaje para mostrar en pantalla si falta configurar el servidor (null = todo bien) */
+export function errorDeConfiguracion(): string | null {
+  const secreto = process.env.AUTH_SECRET;
+  if (!secreto || secreto.length < 32)
+    return "El servidor no está configurado: falta la variable AUTH_SECRET (mínimo 32 caracteres). Agrégala en Vercel → Settings → Environment Variables y vuelve a desplegar.";
+  return null;
+}
+
 function clave() {
   const secreto = process.env.AUTH_SECRET;
   if (!secreto || secreto.length < 32) throw new Error("AUTH_SECRET debe tener al menos 32 caracteres");

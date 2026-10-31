@@ -17,6 +17,7 @@ import {
   validarContrasena,
   verificarContrasena,
 } from "@/lib/seguridad";
+import { errorDeConfiguracion } from "@/lib/sesion-token";
 import {
   borrarTicketActivacion,
   cerrarSesion,
@@ -33,6 +34,8 @@ const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
 // ───────────── Iniciar sesión ─────────────
 export async function entrar(_: Estado, f: FormData): Promise<Estado> {
+  const config = errorDeConfiguracion();
+  if (config) return { error: config };
   const identificador = s(f, "identificador");
   const contrasena = s(f, "contrasena");
   if (!identificador || !contrasena) return { error: "Escribe tu número de contrato (o correo) y tu contraseña." };
@@ -60,6 +63,8 @@ export async function entrar(_: Estado, f: FormData): Promise<Estado> {
 
 // ───────────── Activación: paso 1 (contrato + teléfono) ─────────────
 export async function iniciarActivacion(_: Estado, f: FormData): Promise<Estado> {
+  const config = errorDeConfiguracion();
+  if (config) return { error: config };
   const numero = normalizarContrato(s(f, "contrato"));
   const telefono = normalizarTelefono(s(f, "telefono"));
   if (!numero || telefono.length !== 10) return { paso: "datos", error: "Escribe tu número de contrato y tu teléfono a 10 dígitos." };
@@ -132,6 +137,8 @@ export async function completarActivacion(_: Estado, f: FormData): Promise<Estad
 
 // ───────────── Recuperar contraseña ─────────────
 export async function solicitarRecuperacion(_: Estado, f: FormData): Promise<Estado> {
+  const config = errorDeConfiguracion();
+  if (config) return { error: config };
   const identificador = s(f, "identificador");
   if (!identificador) return { error: "Escribe tu número de contrato o tu correo." };
   const clave = `recuperar:${identificador.toLowerCase()}`;

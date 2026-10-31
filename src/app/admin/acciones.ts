@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { normalizarContrato, normalizarTelefono, pesosACentavos, slugify } from "@/lib/formato";
 import { importar, type Reporte, type TipoImportacion } from "@/lib/importacion";
 import { bloqueado, hashContrasena, MENSAJE_BLOQUEO, registrarIntento, validarContrasena, verificarContrasena } from "@/lib/seguridad";
+import { errorDeConfiguracion } from "@/lib/sesion-token";
 import { cerrarSesion, iniciarSesion, requerirSesion } from "@/lib/sesion";
 import { parsearFecha } from "@/lib/importacion";
 
@@ -14,6 +15,8 @@ const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const admin = () => requerirSesion("admin");
 
 export async function entrar(_: Estado, f: FormData): Promise<Estado> {
+  const config = errorDeConfiguracion();
+  if (config) return { error: config };
   const email = s(f, "email").toLowerCase();
   const clave = `admin:${email}`;
   if (await bloqueado(clave)) return { error: MENSAJE_BLOQUEO };
