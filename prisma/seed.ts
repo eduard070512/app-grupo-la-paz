@@ -2,15 +2,18 @@
  * Datos de DEMOSTRACIÓN. Borra y vuelve a crear todo.
  * Los planes y el contenido son reales (material de La Paz); clientes y empresas son ficticios.
  *
- *   npm run db:seed
+ *   npm run db:demo
+ *
+ * Protección: si la base tiene clientes que no son de demo (datos reales migrados),
+ * se niega a borrar nada.
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { CATALOGO, type PlanCatalogo, type VarianteCatalogo } from "./catalogo";
+import { cargarCatalogo, cargarFunerarias } from "./base";
 
 const db = new PrismaClient();
 const hash = (pw: string) => bcrypt.hashSync(pw, 10);
-const j = (v: unknown) => JSON.stringify(v);
 const c = (pesos: number) => Math.round(pesos * 100);
 
 // PRNG determinista para que la demo sea siempre igual
@@ -19,56 +22,28 @@ const azar = () => ((semilla = (semilla * 1103515245 + 12345) % 2 ** 31) / 2 ** 
 const elegir = <T,>(a: T[]) => a[Math.floor(azar() * a.length)];
 
 async function main() {
+  const USUARIOS_DEMO = ["grupollantero", "ferrevolcan", "dentalsonrisa", "transpacifico", "cafecomala"];
+  const reales =
+    (await db.cliente.count({ where: { OR: [{ claveExterna: null }, { NOT: { claveExterna: { startsWith: "DEMO-" } } }] } })) +
+    (await db.empresa.count({ where: { usuario: { notIn: USUARIOS_DEMO } } }));
+  if (reales > 0) {
+    console.error(`La base tiene ${reales} clientes/empresas que no son de demostración. Por seguridad no se borra nada.`);
+    console.error("Para cargar el catálogo y el admin en una base real usa: npm run db:produccion");
+    process.exit(1);
+  }
+
   console.log("Limpiando base de datos…");
   for (const m of ["intentoAcceso", "codigoVerificacion", "solicitud", "pago", "beneficiario", "contrato", "cliente", "plan", "funeraria", "empresa", "promocion", "admin"] as const) {
     // @ts-expect-error acceso dinámico a delegados
     await db[m].deleteMany();
   }
 
-  // --- Casas funerarias del grupo ---
-  const funerarias = await Promise.all(
-    [
-      { slug: "la-paz", nombre: "Funeraria La Paz", telefono: "3123124511", direccion: "Av. San Fernando No. 200, Centro, Colima, Col.", prefijo: "LP" },
-      { slug: "magana", nombre: "Funeraria Magaña", telefono: "3123145151", direccion: "Colima, Col.", prefijo: "MG" },
-      { slug: "ramos", nombre: "Funerales Ramos", telefono: "3414140298", direccion: "Zapotiltic, Jal.", prefijo: "RM" },
-    ].map(({ prefijo, ...f }, orden) => db.funeraria.create({ data: { ...f, orden } }).then((r) => ({ ...r, prefijo }))),
+  // --- Datos base reales: casas funerarias y catálogo ---
+  const funerarias = await cargarFunerarias(db);
+  const ids = await cargarCatalogo(db);
+  const planes: Record<string, { id: string; variantes: VarianteCatalogo[]; plazos: PlanCatalogo["plazos"] }> = Object.fromEntries(
+    CATALOGO.map((p) => [p.codigo, { id: ids[p.codigo], variantes: p.variantes, plazos: p.plazos }]),
   );
-
-  // --- Catálogo de planes (catálogo oficial marzo 2026) ---
-  const porSlug = Object.fromEntries(funerarias.map((f) => [f.slug, f]));
-  const planes: Record<string, { id: string; precioCentavos: number; variantes: VarianteCatalogo[]; plazos: PlanCatalogo["plazos"] }> = {};
-  for (const [orden, p] of CATALOGO.entries()) {
-    const variantes = p.variantes.map((x) => ({
-      nombre: x.nombre,
-      precioCentavos: c(x.precio),
-      inicialCentavos: c(x.inicial),
-      abonos: Object.fromEntries(Object.entries(x.abonos).map(([k, m]) => [k, c(m!)])),
-      ...(x.nota ? { nota: x.nota } : {}),
-    }));
-    const creado = await db.plan.create({
-      data: {
-        codigo: p.codigo,
-        nombre: p.nombre,
-        categoria: p.categoria,
-        funerariaId: p.funeraria ? porSlug[p.funeraria].id : null,
-        subtitulo: p.subtitulo,
-        resumen: p.resumen,
-        moneda: p.moneda ?? "MXN",
-        precioCentavos: Math.min(...variantes.map((x) => x.precioCentavos)),
-        incluye: j(p.incluye),
-        beneficios: j(p.beneficios),
-        cremacion: j(p.cremacion ?? []),
-        variantes: j(variantes),
-        plazos: j(p.plazos),
-        aplicaPara: p.aplicaPara,
-        notas: p.notas,
-        imagenUrl: `/planes/${p.imagen}-mini.jpg`,
-        fichaUrl: `/planes/${p.imagen}.jpg`,
-        orden,
-      },
-    });
-    planes[p.codigo] = { id: creado.id, precioCentavos: creado.precioCentavos, variantes: p.variantes, plazos: p.plazos };
-  }
 
   type Esquema = { planId: string; total: number; frecuencia: string; inicial: number; abono: number; n: number };
   /** Esquema de pago real tomado de la variante del catálogo */
@@ -158,7 +133,7 @@ async function main() {
   const magana = funerarias[1];
 
   const maria = await db.cliente.create({
-    data: { nombre: "María Fernanda López Torres", telefono: "3121234567", email: "maria.demo@grupolapaz.mx", passwordHash: pwDemo, activadoEn: new Date(), funerariaId: laPaz.id },
+    data: { nombre: "María Fernanda López Torres", telefono: "3121234567", email: "maria.demo@grupolapaz.mx", passwordHash: pwDemo, activadoEn: new Date(), funerariaId: laPaz.id, claveExterna: "DEMO-MARIA" },
   });
   await crearContrato({
     numero: "LP-10001",
@@ -177,12 +152,12 @@ async function main() {
   });
 
   const jose = await db.cliente.create({
-    data: { nombre: "José Luis Ramírez Mendoza", telefono: "3127654321", funerariaId: laPaz.id },
+    data: { nombre: "José Luis Ramírez Mendoza", telefono: "3127654321", funerariaId: laPaz.id, claveExterna: "DEMO-JOSE" },
   });
   await crearContrato({ numero: "LP-10002", clienteId: jose.id, funerariaId: laPaz.id, esquema: esquemas[2], inicio: paso("MENSUAL", hoy, -14), perfil: "atrasado" });
 
   const rosa = await db.cliente.create({
-    data: { nombre: "Rosa Elena Ruiz Contreras", telefono: "3129876543", email: "rosa.demo@grupolapaz.mx", passwordHash: pwDemo, activadoEn: new Date(), funerariaId: magana.id },
+    data: { nombre: "Rosa Elena Ruiz Contreras", telefono: "3129876543", email: "rosa.demo@grupolapaz.mx", passwordHash: pwDemo, activadoEn: new Date(), funerariaId: magana.id, claveExterna: "DEMO-ROSA" },
   });
   await crearContrato({ numero: "MG-20001", clienteId: rosa.id, funerariaId: magana.id, esquema: esquemas[10], inicio: paso("MENSUAL", hoy, -40), perfil: "liquidado" });
   await crearContrato({ numero: "MG-20002", clienteId: rosa.id, funerariaId: magana.id, esquema: esquemas[1], inicio: paso("MENSUAL", hoy, -4), perfil: "puntual" });

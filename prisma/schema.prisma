@@ -1,7 +1,7 @@
-// Modelo de datos Grupo La Paz
+// Modelo de datos Grupo La Paz · PostgreSQL (Neon)
 //
-// DEMO: SQLite (archivo local). PRODUCCIÓN: cambiar `provider` a "postgresql"
-// y DATABASE_URL a la base real; el resto del esquema funciona igual.
+//  DATABASE_URL → cadena "pooled" de Neon (la usa la app)
+//  DIRECT_URL   → cadena directa de Neon (la usan las migraciones)
 //
 // Convenciones:
 //  - Todos los montos se guardan en CENTAVOS (Int) para evitar errores de redondeo.
@@ -13,8 +13,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 /// Casas funerarias que forman Grupo La Paz (La Paz, Magaña, Ramos, …)

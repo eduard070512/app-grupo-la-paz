@@ -19,9 +19,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
     ...(q
       ? {
           OR: [
-            { nombre: { contains: q } },
-            { email: { contains: q.toLowerCase() } },
-            { contratos: { some: { numero: { contains: q.toUpperCase() } } } },
+            { nombre: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { contratos: { some: { numero: { contains: q, mode: "insensitive" } } } },
             ...(tel.length >= 4 ? [{ telefono: { contains: tel } }] : []),
           ],
         }

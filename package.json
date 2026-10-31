@@ -5,14 +5,17 @@
   "description": "Plataforma Grupo La Paz: portal de empresas afiliadas, portal de clientes y panel de administración",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push && tsx prisma/seed.ts",
-    "importar": "tsx scripts/importar.ts",
-    "setup": "prisma db push && tsx prisma/seed.ts"
+    "postinstall": "prisma generate",
+    "db:migrar": "prisma migrate deploy",
+    "db:demo": "tsx prisma/seed.ts",
+    "db:produccion": "tsx prisma/produccion.ts",
+    "setup": "prisma migrate deploy && tsx prisma/seed.ts",
+    "setup:produccion": "prisma migrate deploy && tsx prisma/produccion.ts",
+    "importar": "tsx scripts/importar.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

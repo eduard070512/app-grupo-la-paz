@@ -14,18 +14,47 @@ Los portales de empresas y de clientes se pueden instalar en el celular como **a
 
 ---
 
-## Arrancar la demo
+## Conectar la base de datos (Neon)
 
-Requisitos: Node.js 20 o superior.
+La app usa **PostgreSQL**. Recomendado: [Neon](https://neon.tech) (el plan gratuito alcanza para empezar).
+
+1. En neon.tech crea un proyecto (región **US East**, la más cercana a México).
+2. En **Connect** copia dos cadenas de conexión:
+   - **Pooled** (el host contiene `-pooler`) → `DATABASE_URL`
+   - **Direct** (la misma, sin `-pooler`) → `DIRECT_URL`
+3. Copia `.env.example` a `.env` y pega ahí las dos cadenas. Cambia también `AUTH_SECRET` (`openssl rand -base64 48`).
+4. Instala y crea las tablas:
 
 ```bash
 npm install
-cp .env.example .env        # y cambia AUTH_SECRET por una cadena aleatoria larga
-npm run setup               # crea la base de datos demo y carga datos de prueba
+npm run setup               # crea las tablas en Neon + carga la DEMO (clientes y empresas de prueba)
 npm run dev                 # http://localhost:3000
 ```
 
-`npm run db:reset` vuelve a cargar los datos de prueba desde cero.
+**¿Base real en lugar de demo?** Define `ADMIN_EMAIL`, `ADMIN_NOMBRE` y `ADMIN_PASSWORD` en `.env` y usa:
+
+```bash
+npm run setup:produccion    # crea las tablas + casas funerarias + catálogo + tu administrador (no borra nada)
+```
+
+Después los clientes reales se cargan con **Admin → Importar** (ver *Migración*).
+
+| Script | Qué hace |
+|---|---|
+| `npm run setup` | Migraciones + datos de **demo** |
+| `npm run setup:produccion` | Migraciones + datos **reales** base (funerarias, planes, admin) |
+| `npm run db:demo` | Recarga la demo desde cero. **Se niega a correr si detecta clientes o empresas reales.** |
+| `npm run db:produccion` | Carga/actualiza funerarias, catálogo y admin. Se puede repetir; también sirve para actualizar precios tras editar `prisma/catalogo.ts`. |
+| `npm run db:migrar` | Aplica migraciones pendientes del esquema |
+| `npm run importar -- <tipo> <archivo.csv>` | Importación masiva desde la terminal |
+
+> Sugerencia: crea en Neon dos *branches* — `demo` y `main` — para tener la demo y la base real separadas, cada una con sus propias cadenas de conexión.
+
+### Publicar en Vercel
+1. Importa el repositorio en vercel.com.
+2. En *Settings → Environment Variables* agrega `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `APP_URL` (la URL pública), `WHATSAPP_NUMERO` y, cuando estén listos, `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET`.
+3. Despliega. El script `vercel-build` aplica las migraciones automáticamente en cada despliegue.
+4. La primera vez, carga los datos desde tu computadora (con el mismo `.env`): `npm run db:demo` o `npm run db:produccion`.
 
 ### Cuentas de prueba
 
@@ -120,7 +149,7 @@ Si `N8N_WEBHOOK_URL` está vacío, la app trabaja en **modo demo**.
 
 ## Catálogo de planes
 
-Los planes reales están en `prisma/catalogo.ts`, transcritos del *Catálogo Actual mar 2026*, del *Sistema de Cobertura Familiar* y de *Italia con Capilla 2026*. En total son **18 planes**:
+Los planes reales están en `prisma/catalogo.ts`, transcritos del *Catálogo Actual mar 2026*, del *Sistema de Cobertura Familiar* y de *Italia con Capilla 2026*. En total son **19 planes**:
 
 - **La Paz:** Mónaco, Bosnia, Italia, Combo Italia + Capilla (Colima y Zapotiltic), Tapizado, Cremación Directa, Capilla (6/12/24 h), Nichos (4 y 8 urnas), Devuélvelo a Casa (USD).
 - **Magaña:** Zafiro, Esmeralda, Diamante, Élite, Plan Personalizado, Cremación Directa, Capilla.
@@ -128,21 +157,14 @@ Los planes reales están en `prisma/catalogo.ts`, transcritos del *Catálogo Act
 
 Cada plan guarda todas sus **variantes** (1 a 4 servicios, horas, urnas, tamaño de mascota) con su precio, pago inicial y abonos semanales, quincenales o mensuales. Las imágenes de cada ficha (`public/planes/`) salen del PDF del catálogo.
 
-Para actualizar precios, edita `prisma/catalogo.ts` y vuelve a cargar los datos. Un editor de catálogo en el admin sería el siguiente paso natural.
+Para actualizar precios, edita `prisma/catalogo.ts` y corre `npm run db:produccion` (actualiza el catálogo sin tocar clientes). Un editor de catálogo en el admin sería el siguiente paso natural.
 
 ---
 
 ## Migración de los datos reales
 
 ### 1. Base de datos de producción
-La demo usa SQLite (un archivo). Para producción con miles de clientes:
-
-1. Crea una base **PostgreSQL** (Supabase, Neon, Railway, AWS RDS…).
-2. En `prisma/schema.prisma` cambia `provider = "sqlite"` por `provider = "postgresql"`.
-3. Pon la URL en `DATABASE_URL` y ejecuta `npx prisma db push` (o `prisma migrate deploy`).
-4. **No** ejecutes el seed de demo en producción. Crea el admin real y carga el catálogo. Se puede usar una versión del seed que solo cree funerarias, planes y admin.
-
-> En PostgreSQL, las búsquedas del admin distinguen mayúsculas y minúsculas. Al migrar conviene agregar `mode: "insensitive"` en `src/app/admin/(portal)/clientes/page.tsx`.
+Con Neon conectado (ver arriba), corre `npm run setup:produccion`. Crea las tablas, las 3 casas funerarias, el catálogo y tu usuario administrador **sin datos de prueba**.
 
 ### 2. Exportar del sistema actual a CSV
 Plantillas en `public/plantillas/` (también se descargan desde **Admin → Importar**):
@@ -175,8 +197,11 @@ Si el sistema actual seguirá siendo el principal para cobranza, un workflow de 
 
 ```
 prisma/
-  schema.prisma        Modelo de datos (funerarias, planes, clientes, contratos, pagos, empresas…)
+  schema.prisma        Modelo de datos (PostgreSQL)
+  migrations/          Migraciones del esquema
   catalogo.ts          Catálogo real de planes y precios
+  base.ts              Carga de funerarias y catálogo (compartida)
+  produccion.ts        Carga inicial de producción (funerarias, catálogo, admin)
   seed.ts              Datos de demostración
 scripts/importar.ts    Importación CSV desde la terminal
 src/
@@ -194,7 +219,7 @@ public/
   manifest-*.webmanifest    PWA de clientes y de empresas
 ```
 
-**Tecnología:** Next.js 15 (App Router, Server Actions), React 19, Prisma 6, Tailwind CSS 4, TypeScript.
+**Tecnología:** Next.js 15 (App Router, Server Actions), React 19, Prisma 6 + PostgreSQL (Neon), Tailwind CSS 4, TypeScript.
 
 ## Pendientes y siguientes pasos sugeridos
 - Confirmar teléfonos y direcciones de **Funerales Ramos** (en la demo: 341 414 0298, Zapotiltic).
