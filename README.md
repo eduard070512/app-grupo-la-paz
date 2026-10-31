@@ -52,9 +52,15 @@ Después los clientes reales se cargan con **Admin → Importar** (ver *Migraci�
 
 ### Publicar en Vercel
 1. Importa el repositorio en vercel.com.
-2. En *Settings → Environment Variables* agrega `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `APP_URL` (la URL pública), `WHATSAPP_NUMERO` y, cuando estén listos, `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET`.
-3. Despliega. El script `vercel-build` aplica las migraciones automáticamente en cada despliegue.
-4. La primera vez, carga los datos desde tu computadora (con el mismo `.env`): `npm run db:demo` o `npm run db:produccion`.
+2. Conecta Neon: pestaña **Storage → Neon** (crea `DATABASE_URL` y `DATABASE_URL_UNPOOLED` automáticamente), **o** agrega a mano `DATABASE_URL` (y opcionalmente `DIRECT_URL`) en *Settings → Environment Variables*.
+3. Agrega también:
+   - `AUTH_SECRET`: cadena aleatoria de 32+ caracteres (**obligatoria**, sin ella no se puede iniciar sesión)
+   - `APP_URL`: la URL pública (p. ej. `https://app-grupo-la-paz.vercel.app`)
+   - `CARGA_INICIAL`: `demo` o `produccion` (si es `produccion`, agrega `ADMIN_EMAIL`, `ADMIN_NOMBRE`, `ADMIN_PASSWORD`)
+   - Cuando estén listos: `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET`
+4. Despliega. En cada despliegue se aplican las migraciones y, **solo si la base está vacía**, se cargan los datos según `CARGA_INICIAL`. Si la base ya tiene datos, no se toca.
+
+> Si no existe `DIRECT_URL`, las migraciones la toman de `DATABASE_URL_UNPOOLED` o de `DATABASE_URL` (`scripts/con-db.mjs`).
 
 ### Cuentas de prueba
 

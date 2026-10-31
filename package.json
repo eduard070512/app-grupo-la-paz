@@ -6,15 +6,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "vercel-build": "prisma generate && node scripts/con-db.mjs prisma migrate deploy && tsx prisma/inicializar.ts && next build",
     "start": "next start",
     "lint": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "db:migrar": "prisma migrate deploy",
+    "db:migrar": "node scripts/con-db.mjs prisma migrate deploy",
     "db:demo": "tsx prisma/seed.ts",
     "db:produccion": "tsx prisma/produccion.ts",
-    "setup": "prisma migrate deploy && tsx prisma/seed.ts",
-    "setup:produccion": "prisma migrate deploy && tsx prisma/produccion.ts",
+    "setup": "node scripts/con-db.mjs prisma migrate deploy && tsx prisma/seed.ts",
+    "setup:produccion": "node scripts/con-db.mjs prisma migrate deploy && tsx prisma/produccion.ts",
     "importar": "tsx scripts/importar.ts"
   },
   "prisma": {
